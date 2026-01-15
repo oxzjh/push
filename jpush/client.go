@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
+
+	"github.com/oxzjh/push"
 )
 
 const URL_PUSH = "https://api.jpush.cn/v3/push"
@@ -16,7 +17,7 @@ type Client struct {
 	iosDevMode    bool
 }
 
-func (c *Client) send(req *http.Request) ([]byte, error) {
+func (c *Client) send(req *http.Request) (*push.Response, error) {
 	req.Header.Set("Authorization", c.authorization)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -27,13 +28,13 @@ func (c *Client) send(req *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if res.StatusCode != http.StatusOK {
-		return nil, errors.New(string(b))
-	}
-	return b, nil
+	return &push.Response{
+		StatusCode: res.StatusCode,
+		Content:    b,
+	}, nil
 }
 
-func (c *Client) Get(url string) ([]byte, error) {
+func (c *Client) Get(url string) (*push.Response, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -41,7 +42,7 @@ func (c *Client) Get(url string) ([]byte, error) {
 	return c.send(req)
 }
 
-func (c *Client) Post(url string, data any) ([]byte, error) {
+func (c *Client) Post(url string, data any) (*push.Response, error) {
 	body, _ := json.Marshal(data)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
@@ -51,7 +52,7 @@ func (c *Client) Post(url string, data any) ([]byte, error) {
 	return c.send(req)
 }
 
-func (c *Client) PushBody(body *Body) ([]byte, error) {
+func (c *Client) PushBody(body *Body) (*push.Response, error) {
 	if body.Options == nil {
 		body.Options = &Option{}
 	}
@@ -61,11 +62,11 @@ func (c *Client) PushBody(body *Body) ([]byte, error) {
 	return c.Post(URL_PUSH, body)
 }
 
-func (c *Client) Push(id, title, content string) ([]byte, error) {
+func (c *Client) Push(id, title, content string) (*push.Response, error) {
 	return c.PushAll([]string{id}, title, content)
 }
 
-func (c *Client) PushAll(ids []string, title, content string) ([]byte, error) {
+func (c *Client) PushAll(ids []string, title, content string) (*push.Response, error) {
 	return c.PushBody(&Body{
 		Platform: PLATFORM_ALL,
 		Audience: &Audience{RegistrationId: ids},
